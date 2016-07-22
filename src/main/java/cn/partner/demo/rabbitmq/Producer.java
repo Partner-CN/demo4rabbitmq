@@ -1,45 +1,41 @@
 package cn.partner.demo.rabbitmq;
 
-import java.io.IOException;
+import org.springframework.amqp.rabbit.connection.ConnectionFactoryUtils;
+import org.springframework.amqp.rabbit.connection.RabbitResourceHolder;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import cn.partner.demo.rabbitmq.RabbitmqUtils.RabbitConstants;
 
 import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.MessageProperties;
 
 /**
  * @author qiao.yongxin
  * @date 2016年7月18日
  */
+@Component
 public class Producer {
 
-    public static void send(String message) {
-        Connection conn = RabbitmqUtils.getConn();
-        Channel channel = null;
-        try {
-            if (!conn.isOpen()) {
-                conn = RabbitmqUtils.getConn();
-            }
-            channel = conn.createChannel();
-            // Transaction begin
-            channel.txSelect();
-            channel.basicPublish(RabbitConstants.EXCHANGE_NAME, RabbitConstants.ROUTING_KEY, false,
-                    MessageProperties.PERSISTENT_TEXT_PLAIN, message.getBytes());
-            System.out.println(String.format("+++send message : %s, channel : %s", message, channel));
-            // when test transaction
-            // throw new RuntimeException();
+    @Autowired
+    private RabbitTemplate amqpTemplate;
 
-            // Transaction commit
-            channel.txCommit();
-        } catch (Exception e) {
-            e.printStackTrace();
-            try {
-                // Transaction rollback
-                channel.txRollback();
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
-            }
+    public void send(String message) {
+
+        amqpTemplate.convertAndSend(RabbitConstants.EXCHANGE_NAME, RabbitConstants.ROUTING_KEY, message);
+
+        RabbitResourceHolder resourceHolder =
+                ConnectionFactoryUtils.getTransactionalResourceHolder(amqpTemplate.getConnectionFactory(), true);
+        Channel channel = resourceHolder.getChannel();
+        System.out.println(String.format("+++send message : %s, channel : %s", message, channel));
+    }
+
+    @Transactional
+    public void poolingSend() {
+        for (int i = 0; i < 5; i++) {
+            send(String.format("hello, rabbitmq(%s)!", i));
         }
+        System.out.println(1 / 0);
     }
 }
