@@ -1,0 +1,5 @@
+spring:
+  rabbitmq:
+    addresses: 10.113.166.67:5672,10.113.166.174:5672
+    username: admin
+    password: admin
